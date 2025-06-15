@@ -13,7 +13,12 @@ class Player:
         self.level = 1
         self.experience = 0
         self.xp_to_next_level = 5  # Começa precisando de 5 XP para o primeiro nível
+        self.projectile_base_damage = 25 # Dano base do projétil principal
         self.enemies_killed = 0  # Contador de inimigos derrotados
+
+        # Atributos para recuperação de vida com gemas
+        self.gems_collected_for_heal = 0
+        self.gems_needed_for_hp_point = 20 # Coletar 20 gemas para recuperar 1 HP
 
         # animations
         self.idle_frames = ["duck-idle1.png", "duck-idle2.png"]
@@ -26,10 +31,29 @@ class Player:
         self.is_moving = False
         self.face_right = True
 
+        # Atributos da Arma Orbital
+        self.orbital_weapon_active = False # Começa desativada
+        self.orbital_actor = None          # Ator da arma orbital, inicializado como None
+        self.orbital_distance = 40         # Distância do jogador
+        self.orbital_angle = 0             # Ângulo inicial
+        self.orbital_rotation_speed = 2.5  # Radianos por segundo
+        self.orbital_damage = 15           # Dano da arma orbital
+
+    def activate_orbital_weapon(self):
+        """Ativa e inicializa a arma orbital."""
+        if not self.orbital_weapon_active: # Ativa somente se não estiver ativa
+            self.orbital_weapon_active = True
+            self.orbital_actor = Actor("orbital_blade.png") # Cria o ator da arma
+            # Garante que a posição inicial da arma orbital seja definida corretamente
+            self.update_orbital_weapon(0) # Chama com dt=0 para definir a posição inicial
+            print("Arma Orbital Ativada!") # Feedback no console
+
     def update(self, dt, screen_width=800, screen_height=600):
         self.handle_input()
         self.check_boundaries(screen_width, screen_height)
         self.animate(dt)
+        if self.orbital_weapon_active and self.orbital_actor:
+            self.update_orbital_weapon(dt)
 
     def draw(self):
         self.actor.draw()
@@ -104,11 +128,26 @@ class Player:
         while self.experience >= self.xp_to_next_level:
             self.experience -= self.xp_to_next_level
             self.level += 1
-            # Aumenta a quantidade de XP necessária para o próximo nível
             self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
             print(f"LEVEL UP! Novo Nível: {self.level}")
             leveled_up_this_call = True
+        
+        # Lógica de cura por gemas (cada gema coletada contribui)
+        # Assumindo que 'amount' de XP vem de uma gema. Se não, ajuste.
+        # Se cada gema dá 10 XP, e queremos 1 HP a cada 20 gemas, então a cada 200 XP de gemas.
+        # Simplificando: vamos contar gemas diretamente.
+        # Esta função é chamada com XP, não com contagem de gemas.
+        # Vamos adicionar um método separado para processar gemas.
         return leveled_up_this_call
+
+    def process_gem_collection(self, xp_from_gem=10):
+        """Chamado quando uma gema é coletada."""
+        leveled_up = self.add_experience(xp_from_gem)
+        self.gems_collected_for_heal += 1
+        if self.gems_collected_for_heal >= self.gems_needed_for_hp_point:
+            self.heal(1) # Recupera 1 ponto de vida
+            self.gems_collected_for_heal = 0 # Reseta o contador
+        return leveled_up
 
     def take_damage(self, amount):
         if self.health > 0:  # Only take damage if alive
@@ -117,9 +156,51 @@ class Player:
         # Game over check will be handled in main.py based on self.health
 
     # def check_level_up(self): # This method is now redundant
-    #     if self.experience >= self.xp_to_next_level:
-    #         self.level += 1
-    #         self.experience -= self.xp_to_next_level
-    #         self.xp_to_next_level = int(self.xp_to_next_level * 1.5)
-    #         print(f"LEVEL UP! Novo Nível: {self.level}")
-    #         # game_state = "level_up" # Player class should not directly modify global game_state
+
+    def heal(self, amount):
+        self.health += amount
+        self.health = min(self.health, self.max_health) # Não ultrapassar a vida máxima
+        print(f"Player healed by {amount}. Current health: {self.health}")
+
+    def update_orbital_weapon(self, dt):
+        if not self.orbital_weapon_active or not self.orbital_actor:
+            return
+
+        self.orbital_angle += self.orbital_rotation_speed * dt
+        self.orbital_angle %= (2 * math.pi)
+        
+        offset_x = math.cos(self.orbital_angle) * self.orbital_distance
+        offset_y = math.sin(self.orbital_angle) * self.orbital_distance
+        self.orbital_actor.pos = (self.actor.x + offset_x, self.actor.y + offset_y)
+        self.orbital_actor.angle = math.degrees(-self.orbital_angle) # Opcional: para girar o sprite
+
+    def draw_orbital_weapon(self):
+        if self.orbital_weapon_active and self.orbital_actor:
+            self.orbital_actor.draw()
+
+    # --- MÉTODOS DE UPGRADE ---
+    def increase_projectile_damage(self, amount):
+        self.projectile_base_damage += amount
+        print(f"Dano do Projétil aumentado para: {self.projectile_base_damage}")
+
+    def increase_movement_speed(self, amount):
+        self.speed += amount
+        print(f"Velocidade do Jogador aumentada para: {self.speed}")
+
+    def increase_max_health(self, amount):
+        self.max_health += amount
+        self.health += amount # Cura o jogador pela quantidade aumentada também
+        self.health = min(self.health, self.max_health) # Garante que não ultrapasse o máximo
+        print(f"Vida Máxima aumentada para: {self.max_health}. Vida Atual: {self.health}")
+
+    def increase_orbital_damage(self, amount):
+        if self.orbital_weapon_active:
+            self.orbital_damage += amount
+            print(f"Dano da Arma Orbital aumentado para: {self.orbital_damage}")
+
+    def increase_orbital_rotation_speed(self, amount):
+        if self.orbital_weapon_active:
+            self.orbital_rotation_speed += amount
+            print(f"Velocidade de Rotação da Arma Orbital aumentada para: {self.orbital_rotation_speed}")
+
+    # O método activate_orbital_weapon() já existe e será usado como uma opção de upgrade.
