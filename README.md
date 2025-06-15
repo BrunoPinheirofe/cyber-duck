@@ -1,4 +1,4 @@
-# 🦆 Cyber-Pato: Sobrevivência de Dados 🎮
+# 🦆 Cyber-Duck 🎮
 
 <div align="center">
 
@@ -11,14 +11,14 @@
 
 ## 📖 Descrição
 
-**Cyber-Pato: Sobrevivência de Dados** é um jogo de ação 2D desenvolvido em Python usando Pygame Zero. Controle um pato cibernético que deve sobreviver a ondas de inimigos enquanto coleta gemas de experiência para evoluir e se tornar mais poderoso!
+**Cyber-Duck** é um jogo de ação 2D desenvolvido em Python usando Pygame Zero. Controle um pato cibernético que deve sobreviver a ondas de inimigos enquanto coleta gemas de experiência para evoluir e se tornar mais poderoso!
 
 ### 🎯 Características Principais
-
 - 🎮 **Gameplay dinâmico**: Sistema de combate com projéteis e inimigos
 - 📈 **Sistema de progressão**: Coleta XP e evolua de nível com barra de progresso visual
 - 🐺 **Inimigos inteligentes**: Lobos que perseguem o jogador de forma inteligente
 - 💎 **Sistema de recompensas**: Gemas de experiência que dropam dos inimigos eliminados
+- 🔊 **Efeitos Sonoros**: Feedback auditivo para ações do jogo
 - 🎨 **Interface intuitiva**: Barra de XP na parte inferior da tela
 - ⏸️ **Sistema de pausa**: Tela de level up que pausa o jogo automaticamente
 - 🎯 **Controles responsivos**: Movimento suave com WASD ou setas
@@ -34,8 +34,8 @@
 
 1. **Clone o repositório:**
 ```bash
-git clone https://github.com/seu-usuario/teste_game.git
-cd teste_game
+git clone https://github.com/seu-usuario/cyber-duck.git
+cd cyber-duck
 ```
 
 2. **Crie um ambiente virtual (recomendado):**
@@ -84,23 +84,26 @@ pgzrun main.py
 
 ## 🎮 Mecânicas do Jogo
 
-### 🦆 Jogador (Cyber-Pato)
+### 🦆 Jogador (Cyber-Duck)
 - **Movimento**: Controle suave com velocidade de 3 unidades
 - **Tiro**: Projéteis que seguem a direção do mouse
 - **Progressão**: Sistema de níveis com XP crescente
 - **Limites**: Não pode sair da tela
 
-### 🐺 Inimigos (Lobos)
+### 🐺 Inimigos: Morcegos e Lobos 🦇
 - **IA**: Perseguem o jogador de forma inteligente
 - **Spawn**: Aparecem nas bordas da tela a cada 2 segundos
 - **Velocidade**: Variável entre 1.0 e 2.0 unidades
 - **Recompensa**: Dropam gemas de XP quando eliminados
+
+
 
 ### 💎 Sistema de XP
 - **Coleta**: Cada gema vale 1 ponto de experiência
 - **Progressão**: XP necessário aumenta 50% a cada nível
 - **Visual**: Barra de progresso na parte inferior da tela
 - **Level Up**: Tela de pausa automática ao subir de nível
+
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -112,20 +115,17 @@ pgzrun main.py
 ## 📁 Estrutura do Projeto
 
 ```
-teste_game/
-├── main.py              # Arquivo principal do jogo (227 linhas)
-├── requirements.txt     # Dependências do projeto
-├── images/              # Pasta com sprites e assets
-│   ├── pato_placeholder.png  # Sprite do jogador
-│   ├── wolf.png              # Sprite dos inimigos
-│   ├── bullet.png            # Sprite dos projéteis
-│   └── gem.png               # Sprite das gemas de XP
-├── duck-idle2.png       # Asset adicional do pato
-├── bomb.png             # Asset de bomba
-├── tile_0105.png        # Asset de tile
-├── tile_0129.png        # Asset de tile
-├── README.md            # Este arquivo
-└── .gitignore          # Arquivos ignorados pelo Git
+├── .venv/                  # Ambiente virtual Python (se estiver usando)
+├── Enemy.py                # Lógica da classe Inimigo
+├── Itens.py                # Lógica da classe Itens
+├── Player.py               # Lógica da classe Jogador
+├── main.py                 # Arquivo principal com a lógica do jogo
+├── images/                 # Diretório para todos os assets visuais
+├── music/                  # Diretório para arquivos de música de fundo
+├── sounds/                 # Diretório para todos os efeitos sonoros
+├── README.md               # Arquivo de descrição do projeto
+└── requirements.txt        # Lista de dependências Python
+
 ```
 
 ## 🎮 Estados do Jogo
@@ -143,6 +143,7 @@ teste_game/
 - Progresso salvo
 
 ## 🔧 Configurações do Jogo
+As principais configurações do jogo podem ser encontradas no arquivo `main.py`:
 
 ```python
 # Configurações da janela
@@ -181,24 +182,7 @@ pip install pygame
 
 ### 🐍 Python
 - [📚 Documentação Python](https://docs.python.org/)
-- [🎮 Pygame Documentation](https://www.pygame.org/docs/)
 
-## 🤝 Contribuindo
 
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
 
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
-## 👨‍💻 Desenvolvedor
-
-Desenvolvido com ❤️ usando Python e Pygame Zero.
-
----
-
-**Divirta-se jogando Cyber-Pato: Sobrevivência de Dados!** 🦆🎮
+**Divirta-se jogando Cyber-Duck** 🦆🎮

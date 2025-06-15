@@ -1,402 +1,324 @@
-
 import pgzrun
 import math
 import random
 from pygame.rect import Rect
-from Player import Player
-from Enemy import Enemy
+from Player import Player # Nome importado, mantido
+from Enemy import Wolf, Bat # Nomes importados, mantidos
+from Itens import get_upgrade_options # Nome importado, mantido
 
-# --- GAME WINDOW CONFIGURATION ---
-WIDTH = 800
-HEIGHT = 600
-TITLE = "Cyber-Duck: Data Survival"
+# --- CONFIGURAÇÃO DA JANELA DO JOGO ---
+WIDTH = 1200
+HEIGHT =  800
+TITLE = "Cyber-Duck" # Título do jogo, mantido
 
-# --- GAME STATES ---
-# Controls the current state of the game (Menu, Playing, Game Over).
-class GameState:
+
+class EstadoJogo:
     MENU = 0
-    PLAYING = 1
-    GAME_OVER = 2
-    LEVEL_UP_CHOICE = 3 # Novo estado para a tela de escolha de upgrade
-
-# --- INITIAL SETUP ---
-game_state = GameState.MENU
-sound_enabled = True
-elapsed_time = 0
-# level_up_display_timer = 0.0  # Timer para exibir a mensagem de level up (será substituído pela tela de escolha)
-# A mensagem "LEVEL UP!" será parte da tela de escolha.
-LEVEL_UP_MESSAGE_DURATION = 2.0 # Duração que a mensagem fica na tela (em segundos)
-
-# --- HEALTH DISPLAY CONFIGURATION ---
-NUM_HEART_CONTAINERS = 5
-HEART_IMAGE_WIDTH = 16  # Assuming heart images are 16px wide. Adjust if different.
-HEART_SPACING = 4       # Spacing between hearts.
-
-# --- GAME OBJECT LISTS ---
-enemies = []
-projectiles = []
-experience_gems = []
+    JOGANDO = 1
+    FIM_DE_JOGO = 2
+    ESCOLHA_MELHORIA = 3
 
 
-# --- LEVEL UP CHOICE SCREEN ---
-level_up_options = [] # Lista para armazenar as descrições e funções das opções de upgrade
-option_buttons = []   # Lista para armazenar os Rects dos botões de opção
+# --- CONFIGURAÇÃO INICIAL ---
+estado_jogo = EstadoJogo.MENU
+som_ligado = True
+tempo_decorrido = 0
 
-# --- UI COLOR CONSTANTS ---
-BUTTON_DEFAULT_COLOR = (0, 70, 130)    # Darker blue for default button state
-BUTTON_HOVER_COLOR = (0, 100, 180)     # Brighter blue for button hover state
-BUTTON_TEXT_COLOR = (255, 255, 255)  # White for button text
+# --- CONFIGURAÇÃO DA INTERFACE DO USUÁRIO (UI) ---
+NUM_CORACOES_VIDA = 5
+WIDTH_IMAGEM_CORACAO = 16 # Largura da imagem do coração
+ESPACAMENTO_CORACAO = 4
 
-# --- MENU BUTTONS ---
-# Define rectangles for menu buttons to detect clicks.
-play_button = Rect(WIDTH / 2 - 100, HEIGHT / 2, 200, 50)
-sound_button = Rect(WIDTH / 2 - 100, HEIGHT / 2 + 70, 200, 50)
-exit_button = Rect(WIDTH / 2 - 100, HEIGHT / 2 + 140, 200, 50)
+COR_BOTAO_PADRAO = (0, 70, 130)
+COR_BOTAO_CURSOR = (0, 100, 180) # Cor quando o cursor está sobre (ou para botões de escolha)
+COR_TEXTO_BOTAO = (255, 255, 255)
+
+# --- BOTÕES DO MENU ---
+botao_jogar = Rect(WIDTH / 2 - 100, HEIGHT / 2, 200, 50)
+botao_som = Rect(WIDTH / 2 - 100, HEIGHT / 2 + 70, 200, 50)
+botao_sair = Rect(WIDTH / 2 - 100, HEIGHT / 2 + 140, 200, 50)
+
+# --- OBJETOS DO JOGO ---
+inimigos = []
+projeteis = []
+gemas_experiencia = []
+opcoes_melhoria = [] # Anteriormente level_up_options
+botoes_opcao = []
 
 
-# --- RESET GAME FUNCTION ---
-def reset_game():
-    """Resets all game variables to their initial state."""
-    global player, enemies, projectiles, experience_gems, elapsed_time
-    
-    # Initialize the player at the center of the screen
-    player = Player((WIDTH / 2, HEIGHT / 2))
-    
-    
-    # Clear all game object lists
-    enemies.clear()
-    projectiles.clear()
-    experience_gems.clear()
-    
-    # Reset game statistics
-    elapsed_time = 0
-    player.gems_collected_for_heal = 0 # Resetar contador de gemas para cura
-    # Limpar opções de level up anteriores, se houver
-    level_up_options.clear()
-    option_buttons.clear()
-    
-    # Schedule the first enemy spawn
-    clock.schedule_unique(spawn_enemy, 2.0)
-    
-    # Start background music if sound is enabled
-    if sound_enabled:
-        print("DEBUG: Sound is enabled. Attempting to play background music.")
+# --- CONFIGURAÇÃO DO JOGADOR ---
+jogador = Player((WIDTH / 2, HEIGHT / 2)) # 'Player' é o nome da classe importada
+
+
+# --- FUNÇÃO PARA REINICIAR O JOGO ---
+def reiniciar_jogo():
+    """Reinicia todas as variáveis do jogo para o estado inicial."""
+    global jogador, inimigos, projeteis, gemas_experiencia, tempo_decorrido, estado_jogo
+
+    jogador = Player((WIDTH / 2, HEIGHT / 2))
+
+    # Limpa todas as listas de objetos do jogo
+    inimigos.clear()
+    projeteis.clear()
+    gemas_experiencia.clear()
+    opcoes_melhoria.clear()
+    botoes_opcao.clear()
+
+    tempo_decorrido = 0
+
+    clock.schedule_unique(gerar_inimigo, 2.0) # 'gerar_inimigo' é a função traduzida
+
+    if som_ligado:
         try:
-            music.play("background_music") # Pygame Zero will try .ogg, .wav, .mp3
-            music.set_volume(0.3)
-            print("DEBUG: music.play('background_music') called. Volume set to 0.3.")
-            # You can add a delayed check to see if music is actually busy
-            # import pygame # Add this at the top if you use the check below
-            # def check_music_status():
-            #    if pygame.mixer.music.get_busy():
-            #        print("DEBUG: Pygame reports music is playing.")
-            #    else:
-            #        print("DEBUG: Pygame reports music is NOT playing. Check file, path, format, and system audio settings.")
-            # clock.schedule_unique(check_music_status, 0.2) # Check after 0.2 seconds
-        except Exception as e: # More specific: except pygame.error as e: (requires pygame import)
-            print(f"DEBUG: An error occurred trying to play music: {e}")
-            print("DEBUG: Please ensure 'background_music.ogg' (recommended), '.wav', or '.mp3' exists in a 'music' folder relative to your main.py.")
+            music.play("background_music") 
+            music.set_volume(0.5)  # Ajusta o volume da música de fundo
+        except Exception as e:
+            print(f"Erro ao tocar música de fundo: {e}")
     else:
-        print("DEBUG: Sound is disabled in settings. Music will not be played.")
+        music.set_volume(0)
+        
+        
+def desenhar_menu():
+    """Desenha a tela do menu principal."""
+    screen.fill((10, 10, 30)) # 'screen' é um objeto global do Pygame Zero
+    screen.draw.text("Cyber-Duck", center=(WIDTH / 2, HEIGHT / 2 - 150), fontsize=80, color="cyan")
+    screen.draw.text("Data Survival", center=(WIDTH / 2, HEIGHT / 2 - 90), fontsize=50, color="yellow")
 
-# Initialize player for the first time
-player = Player((WIDTH / 2, HEIGHT / 2)) # Corrigido para centro da tela
+    screen.draw.filled_rect(botao_jogar, (0, 100, 150))
+    screen.draw.text("Jogar", center=botao_jogar.center, fontsize=40, color="white")
 
+    texto_som = "Sons: LIGADO" if som_ligado else "Sons: DESLIGADO"
+    screen.draw.filled_rect(botao_som, (0, 100, 150))
+    screen.draw.text(texto_som, center=botao_som.center, fontsize=40, color="white")
 
-# --- DRAW FUNCTIONS ---
-def draw_menu():
-    """Draws the main menu screen."""
-    screen.fill((10, 10, 30))  # Dark blue background
-    screen.draw.text(
-        "Cyber-Duck", center=(WIDTH / 2, HEIGHT / 2 - 150), fontsize=80, color="cyan"
-    )
-    screen.draw.text(
-        "Data Survival", center=(WIDTH / 2, HEIGHT / 2 - 90), fontsize=50, color="yellow"
-    )
+    screen.draw.filled_rect(botao_sair, (150, 0, 0))
+    screen.draw.text("Sair", center=botao_sair.center, fontsize=40, color="white")
 
-    # Draw buttons
-    screen.draw.filled_rect(play_button, (0, 100, 150))
-    screen.draw.text("Play", center=play_button.center, fontsize=40, color="white")
+def desenhar_jogando():
+    """Desenha todos os elementos para o estado principal de jogo."""
+    screen.fill((20, 20, 40))
 
-    sound_text = "Sound: ON" if sound_enabled else "Sound: OFF"
-    screen.draw.filled_rect(sound_button, (0, 100, 150))
-    screen.draw.text(sound_text, center=sound_button.center, fontsize=40, color="white")
+    jogador.draw()
+    if jogador.orbital_weapon_active: # Assumindo que 'orbital_weapon_active' é um atributo da classe Player
+        jogador.draw_orbital_weapon() # Assumindo que 'draw_orbital_weapon' é um método da classe Player
+        
+    for gema in gemas_experiencia: gema.draw()
+    for inimigo_obj in inimigos: inimigo_obj.draw() # Renomeado 'enemy' para 'inimigo_obj' para evitar conflito com módulo Enemy
+    for projetil_obj in projeteis: projetil_obj.draw() # Renomeado 'projectile' para 'projetil_obj'
 
-    screen.draw.filled_rect(exit_button, (150, 0, 0))
-    screen.draw.text("Exit", center=exit_button.center, fontsize=40, color="white")
-
-def draw_playing():
-    """Draws all elements during the gameplay state."""
-    screen.fill((20, 20, 40))  # Darker blue background for gameplay
-
-    # Draw all game objects
-    player.draw()
-    for gem in experience_gems:
-        gem.draw()
-    for enemy in enemies:
-        enemy.draw()
-    if player.orbital_weapon_active: # Desenhar a arma orbital
-        player.draw_orbital_weapon()
-    for projectile in projectiles:
-        projectile.draw()
-
-    # Draw the experience bar
-    xp_bar_width = (player.experience / player.xp_to_next_level) * WIDTH if player.xp_to_next_level > 0 else 0
+    # --- ELEMENTOS DA UI ---
+    # Barra de Experiência
+    largura_barra_xp = (jogador.experience / jogador.xp_to_next_level) * WIDTH if jogador.xp_to_next_level > 0 else 0
     screen.draw.filled_rect(Rect((0, HEIGHT - 20), (WIDTH, 20)), (10, 10, 30))
-    screen.draw.filled_rect(Rect((0, HEIGHT - 20), (xp_bar_width, 20)), (100, 200, 255))
-    screen.draw.text(f"Level: {player.level}", (10, HEIGHT - 22), fontsize=20, color="white")
+    screen.draw.filled_rect(Rect((0, HEIGHT - 20), (largura_barra_xp, 20)), (100, 200, 255))
+    screen.draw.text(f"Nível: {jogador.level}", (10, HEIGHT - 22), fontsize=20, color="white")
 
-    # Draw elapsed time
-    minutes = int(elapsed_time // 60)
-    seconds = int(elapsed_time % 60)
-    screen.draw.text(f"Time: {minutes:02d}:{seconds:02d}", topright=(WIDTH - 10, 10), fontsize=30, color="white")
-    # Draw player health (hearts)
-    health_per_heart = player.max_health / NUM_HEART_CONTAINERS
-    heart_x_start = 10
-    heart_y = 10
+    # Tempo Decorrido
+    minutos, segundos = divmod(int(tempo_decorrido), 60)
+    screen.draw.text(f"Tempo: {minutos:02d}:{segundos:02d}", topright=(WIDTH - 10, 10), fontsize=30, color="white")
 
-    for i in range(NUM_HEART_CONTAINERS):
-        current_heart_x = heart_x_start + i * (HEART_IMAGE_WIDTH + HEART_SPACING)
-        # If player's health is greater than the health represented by previous hearts,
-        # this heart is at least partially full (we draw it as full).
-        if player.health > i * health_per_heart:
-            screen.blit("heart_full.png", (current_heart_x, heart_y))
-        else:
-            screen.blit("heart_empty.png", (current_heart_x, heart_y))
+    # Vida do Jogador
+    vida_por_coracao = jogador.max_health / NUM_CORACOES_VIDA
+    for i in range(NUM_CORACOES_VIDA):
+        pos_x_coracao = 10 + i * (WIDTH_IMAGEM_CORACAO + ESPACAMENTO_CORACAO)
+        nome_imagem = "heart_full.png" if jogador.health > i * vida_por_coracao else "heart_empty.png" # Nomes dos arquivos de imagem mantidos
+        screen.blit(nome_imagem, (pos_x_coracao, 10))
 
-
-
-def draw_game_over():
-    """Draws the game over screen with final stats."""
-    screen.fill((30, 10, 10))  # Dark red background
-    screen.draw.text("GAME OVER", center=(WIDTH / 2, HEIGHT / 2 - 100), fontsize=90, color="red")
+def desenhar_fim_de_jogo():
+    """Desenha a tela de fim de jogo."""
+    screen.fill((30, 10, 10))
+    screen.draw.text("FIM DE JOGO", center=(WIDTH / 2, HEIGHT / 2 - 100), fontsize=90, color="red")
     
-    minutes = int(elapsed_time // 60)
-    seconds = int(elapsed_time % 60)
+    minutos, segundos = divmod(int(tempo_decorrido), 60)
+    screen.draw.text(f"Tempo Sobrevivido: {minutos:02d}:{segundos:02d}", center=(WIDTH / 2, HEIGHT / 2), fontsize=40, color="white")
+    screen.draw.text(f"Inimigos Derrotados: {jogador.enemies_killed}", center=(WIDTH / 2, HEIGHT / 2 + 50), fontsize=40, color="white")
+    screen.draw.text(f"Nível Final: {jogador.level}", center=(WIDTH / 2, HEIGHT / 2 + 100), fontsize=40, color="white")
+    screen.draw.text("Clique para voltar ao menu", center=(WIDTH / 2, HEIGHT - 50), fontsize=30, color="yellow")
+
+def desenhar_escolha_melhoria():
+    """Desenha a tela de escolha de melhoria ao subir de nível."""
+    desenhar_jogando() # Desenha o estado de jogo pausado ao fundo
+    # Sobreposição escura
+    sobreposicao_escura = Rect(0, 0, WIDTH, HEIGHT)
+    screen.draw.filled_rect(sobreposicao_escura, (0, 0, 0, 150))
     
-    # Display final stats
-    screen.draw.text(f"Time Survived: {minutes:02d}:{seconds:02d}", center=(WIDTH / 2, HEIGHT / 2), fontsize=40, color="white")
-    screen.draw.text(f"Enemies Defeated: {player.enemies_killed}", center=(WIDTH / 2, HEIGHT / 2 + 50), fontsize=40, color="white")
-    screen.draw.text(f"Final Level: {player.level}", center=(WIDTH / 2, HEIGHT / 2 + 100), fontsize=40, color="white")
-    screen.draw.text("Click to return to menu", center=(WIDTH / 2, HEIGHT - 50), fontsize=30, color="yellow")
+    screen.draw.text(f"SUBIU DE NÍVEL! (Nível {jogador.level})", center=(WIDTH / 2, HEIGHT / 4 - 30), fontsize=60, color="yellow", ocolor="black", owidth=1.5)
+    screen.draw.text("Escolha uma Melhoria:", center=(WIDTH / 2, HEIGHT / 4 + 30), fontsize=40, color="white")
 
-def draw_level_up_choice():
-    screen.fill((25, 25, 60)) # Fundo azul escuro para a tela de escolha
-    screen.draw.text(
-        f"LEVEL UP! (Nível {player.level})",
-        center=(WIDTH / 2, HEIGHT / 4 - 30),
-        fontsize=60,
-        color="yellow",
-        ocolor="black",
-        owidth=1.5
-    )
-    screen.draw.text(
-        "Escolha uma Melhoria:",
-        center=(WIDTH / 2, HEIGHT / 4 + 30),
-        fontsize=40,
-        color="white"
-    )
+    
+    for i, opcao in enumerate(opcoes_melhoria):
+        rect_botao = botoes_opcao[i]
+        cor_botao_atual = COR_BOTAO_CURSOR # Usa a cor de cursor/hover para os botões de escolha
+        screen.draw.filled_rect(rect_botao, cor_botao_atual)
+        screen.draw.text(opcao.description, center=rect_botao.center, fontsize=30, color=COR_TEXTO_BOTAO) # 'opcao.description' vem do módulo Itens
 
-    for i, option in enumerate(level_up_options):
-        button_rect = option_buttons[i]
-        color = BUTTON_HOVER_COLOR if button_rect.collidepoint(mouse.get_pos()) else BUTTON_DEFAULT_COLOR
-        screen.draw.filled_rect(button_rect, color)
-        screen.draw.textbox( # Usar textbox para quebra de linha automática
-            option["text"],
-            button_rect.inflate(-20, -20), # Reduz um pouco para margem interna
-            fontsize=28,
-            color=BUTTON_TEXT_COLOR,
-            align="center"
-        )
-
-# --- MAIN DRAW HOOK ---
-def draw():
-    """PgZero draw hook, called every frame."""
+def draw(): # Hook do Pygame Zero, nome mantido
+    """Hook principal de desenho do PgZero."""
     screen.clear()
-    if game_state == GameState.MENU:
-        draw_menu()
-    elif game_state == GameState.PLAYING: # Apenas desenha o jogo se estiver JOGANDO
-        draw_playing()
-    elif game_state == GameState.GAME_OVER:
-        draw_game_over()
-    elif game_state == GameState.LEVEL_UP_CHOICE:
-        draw_level_up_choice()
+    if estado_jogo == EstadoJogo.MENU:
+        desenhar_menu()
+    elif estado_jogo == EstadoJogo.JOGANDO:
+        desenhar_jogando()
+    elif estado_jogo == EstadoJogo.FIM_DE_JOGO:
+        # O som de fim de jogo é tocado apenas uma vez na transição de estado
+        desenhar_fim_de_jogo()
+    elif estado_jogo == EstadoJogo.ESCOLHA_MELHORIA:
+        # Desenha o jogo pausado ao fundo, depois a UI de escolha por cima
+        desenhar_jogando() 
+        desenhar_escolha_melhoria()
 
+# --- FUNÇÕES DE ATUALIZAÇÃO ---
 
-# --- UPDATE FUNCTIONS ---
-def update_playing(dt):
-    """Main logic update when the game is in the 'PLAYING' state."""
-    global elapsed_time, game_state # level_up_display_timer foi removido da lista global pois não é mais usado aqui
+def atualizar_jogando(dt):
+    """Loop principal de atualização lógica para o estado 'JOGANDO'."""
+    global tempo_decorrido, estado_jogo
 
-    elapsed_time += dt
-    player.update(dt, WIDTH, HEIGHT)
+    tempo_decorrido += dt
+    jogador.update(dt, WIDTH, HEIGHT)
 
-    # Update enemies and handle collisions
-    for e in enemies[:]:
-        e.update(player.actor.pos)
-        # Check for collision with the player
-        if e.actor.colliderect(player.actor):
-            player.take_damage(e.damage_output) # Player takes damage from the enemy
-            if sound_enabled: sounds.hit.play() # Play hit sound
-            
-            # Inimigo que colidiu é removido (ou poderia recuar/ficar invulnerável por um tempo)
-            enemies.remove(e) 
-
-            if player.health <= 0:
-                game_state = GameState.GAME_OVER
+    # --- Lidar com Inimigos ---
+    for inimigo_atual in inimigos[:]: # 'inimigo_atual' é uma instância de Enemy.Wolf ou Enemy.Bat
+        inimigo_atual.update(dt, jogador.actor.pos)
+        
+        # Colisão com jogador
+        if inimigo_atual.actor.colliderect(jogador.actor):
+            jogador.take_damage(inimigo_atual.damage_output)
+            if som_ligado: sounds.hit.play() 
+            inimigos.remove(inimigo_atual)
+            if jogador.health <= 0:
+                estado_jogo = EstadoJogo.FIM_DE_JOGO
+                if som_ligado: sounds.game_over.play()
                 music.stop()
-                # Player defeated sound could be added here if different from generic hit
-                return # Stop processing further logic in this frame if game is over
-            continue # Pula para o próximo inimigo para evitar erros com a lista modificada
+                return
+            continue
 
-        # Check for collision with orbital weapon
-        if player.orbital_weapon_active and player.orbital_actor.colliderect(e.actor):
-            # Aplicar dano ao inimigo. Pode-se adicionar um cooldown aqui para evitar dano contínuo.
-            # Por simplicidade, vamos aplicar dano e se o inimigo morrer, ele é removido.
-            if e.take_damage(player.orbital_damage): # Se o inimigo foi derrotado
-                if e in enemies: enemies.remove(e)
-                experience_gems.append(ExperienceGem(e.actor.pos))
-                player.enemies_killed += 1
-                if sound_enabled: sounds.hit.play() # Som de acerto (pode ser diferente)
-            # Para um efeito de "empurrão" ou dano por segundo, a lógica seria mais complexa.
-            # Por agora, o orbital causa dano ao tocar.
+        # Colisão com arma orbital
+        if jogador.orbital_weapon_active and jogador.orbital_actor.colliderect(inimigo_atual.actor):
+            if inimigo_atual.take_damage(jogador.orbital_damage): # True se o inimigo morreu
+                if inimigo_atual in inimigos: inimigos.remove(inimigo_atual)
+                gemas_experiencia.append(GemaExperiencia(inimigo_atual.actor.pos))
+                jogador.enemies_killed += 1
+            if som_ligado: sounds.hit.play()
 
-    # Update projectiles and check for hits
-    for p in projectiles[:]:
-        p.update()
-        # Remove projectile if it goes off-screen
-        if not p.actor.colliderect(Rect(0, 0, WIDTH, HEIGHT)):
-            projectiles.remove(p)
+    # --- Lidar com Projéteis ---
+    for projetil_atual in projeteis[:]: # 'projetil_atual' é uma instância de Projetil
+        projetil_atual.update()
+        if not projetil_atual.actor.colliderect(Rect(0, 0, WIDTH, HEIGHT)):
+            projeteis.remove(projetil_atual)
             continue
         
-        # Check for projectile hitting an enemy
-        for e in enemies[:]:
-            if e.actor.colliderect(p.actor):
-                if p in projectiles: projectiles.remove(p)
-                
-                if e.take_damage(p.damage): # Se o inimigo foi derrotado pelo projétil
-                    if e in enemies: enemies.remove(e)
-                    experience_gems.append(ExperienceGem(e.actor.pos))
-                    player.enemies_killed += 1
-                if sound_enabled: sounds.hit.play() # Som de acerto
+        for inimigo_atual in inimigos[:]:
+            if inimigo_atual.actor.colliderect(projetil_atual.actor):
+                if projetil_atual in projeteis: projeteis.remove(projetil_atual)
+                if inimigo_atual.take_damage(projetil_atual.dano): # True se o inimigo morreu
+                    if inimigo_atual in inimigos: inimigos.remove(inimigo_atual)
+                    gemas_experiencia.append(GemaExperiencia(inimigo_atual.actor.pos))
+                    jogador.enemies_killed += 1
+                if som_ligado: sounds.hit.play()
                 break
 
-    # Update experience gems and check for collection
-    for gem in experience_gems[:]:
-        if player.actor.colliderect(gem.actor):
-            experience_gems.remove(gem)
-            was_level_up = player.process_gem_collection(xp_from_gem=10) # Usa o novo método
-            if sound_enabled: sounds.collect.play()
-            if was_level_up:
-                if sound_enabled:
-                    sounds.level_up.play()
-                prepare_level_up_choices()
-                game_state = GameState.LEVEL_UP_CHOICE
+    # --- Lidar com Gemas de Experiência ---
+    for gema_atual in gemas_experiencia[:]: # 'gema_atual' é uma instância de GemaExperiencia
+        if jogador.actor.colliderect(gema_atual.actor):
+            gemas_experiencia.remove(gema_atual)
+            if som_ligado: sounds.collect.play() # 'collect' é nome do arquivo de som
+            if jogador.process_gem_collection(): # True se subiu de nível
+                if som_ligado: sounds.level_up.play() # 'level_up' é nome do arquivo de som
+                preparar_escolhas_melhoria()
+                estado_jogo = EstadoJogo.ESCOLHA_MELHORIA
 
-# --- MAIN UPDATE HOOK ---
-def update(dt):
-    """PgZero update hook, called every frame."""
-    if game_state == GameState.PLAYING:
-        update_playing(dt)
+def update(dt): # Hook do Pygame Zero, nome mantido
+    """Hook principal de atualização do PgZero, chamado a cada frame."""
+    if estado_jogo == EstadoJogo.JOGANDO:
+        atualizar_jogando(dt)
 
-# --- LEVEL UP CHOICE LOGIC ---
-def prepare_level_up_choices():
-    """Prepara uma lista de 2 opções de upgrade para o jogador."""
-    global level_up_options, option_buttons
-    level_up_options.clear()
-    option_buttons.clear()
+# --- SUBIR DE NÍVEL & MECÂNICAS DO JOGO ---
 
-    all_possible_upgrades = [
-        {"id": "proj_dmg", "text": "Aumentar Dano do Projétil (+5)", "apply": lambda p: p.increase_projectile_damage(5)},
-        {"id": "player_speed", "text": "Aumentar Velocidade de Movimento (+0.3)", "apply": lambda p: p.increase_movement_speed(0.3)},
-        {"id": "max_hp", "text": "Aumentar Vida Máxima (+10)", "apply": lambda p: p.increase_max_health(10)},
-    ]
-
-    if player.orbital_weapon_active:
-        all_possible_upgrades.append(
-            {"id": "orb_dmg", "text": "Aumentar Dano da Lâmina Orbital (+5)", "apply": lambda p: p.increase_orbital_damage(5)}
-        )
-        all_possible_upgrades.append(
-            {"id": "orb_speed", "text": "Aumentar Velocidade da Lâmina Orbital (+0.5)", "apply": lambda p: p.increase_orbital_rotation_speed(0.5)}
-        )
-    elif player.level >= 2: # Oferecer ativação da arma orbital a partir do nível 2 se ainda não a tiver
-        # Garante que esta opção não seja oferecida se já tiver a arma
-        # (a condição `player.orbital_weapon_active` acima já cuida disso, mas é bom ser explícito)
-        if not any(upg['id'] == "activate_orbital" for upg in all_possible_upgrades):
-             all_possible_upgrades.append(
-                {"id": "activate_orbital", "text": "Desbloquear Lâmina Orbital", "apply": lambda p: p.activate_orbital_weapon()}
-            )
-
-    # Embaralha e seleciona até 2 opções distintas
-    random.shuffle(all_possible_upgrades)
+def preparar_escolhas_melhoria():
+    """Prepara uma lista de opções de melhoria para o jogador."""
+    global opcoes_melhoria, botoes_opcao
+    opcoes_melhoria.clear()
+    botoes_opcao.clear()
     
-    # Tenta pegar 2 opções, mas pega menos se não houver suficientes
-    num_options_to_present = min(2, len(all_possible_upgrades))
-    chosen_upgrades = all_possible_upgrades[:num_options_to_present]
+    # Obtém 2 opções de melhoria aleatórias do sistema de itens
+    opcoes_melhoria = get_upgrade_options(jogador, num_options=2) # 'get_upgrade_options' é importado
 
-    level_up_options.extend(chosen_upgrades)
+    largura_botao, altura_botao, espacamento_botoes = 450, 90, 30
+    num_opcoes = len(opcoes_melhoria)
+    pos_y_inicial_botoes = HEIGHT / 2 - ((altura_botao * num_opcoes + espacamento_botoes * (num_opcoes - 1)) / 2) + 50
 
-    # Define os retângulos dos botões
-    button_width = 400
-    button_height = 80
-    spacing = 30
-    start_y = HEIGHT / 2 - ( (button_height * num_options_to_present + spacing * (num_options_to_present -1) ) / 2 ) + 50
+    for i in range(num_opcoes):
+        pos_y_botao = pos_y_inicial_botoes + i * (altura_botao + espacamento_botoes)
+        botoes_opcao.append(Rect(WIDTH / 2 - largura_botao / 2, pos_y_botao, largura_botao, altura_botao))
 
-    for i, option in enumerate(level_up_options):
-        button_y = start_y + i * (button_height + spacing)
-        option_buttons.append(Rect(WIDTH / 2 - button_width / 2, button_y, button_width, button_height))
-
-# --- EVENT HOOKS ---
-def on_mouse_down(pos, button):
-    """PgZero mouse down event hook."""
-    global game_state, sound_enabled
+def gerar_inimigo():
+    """Gera um novo inimigo em uma posição aleatória fora da tela."""
+    lado_tela = random.choice(['top', 'bottom', 'left', 'right']) # Mantido em inglês para lógica simples, poderia ser traduzido
+    if lado_tela == 'top': posicao_spawn = (random.randint(0, WIDTH), -30)
+    elif lado_tela == 'bottom': posicao_spawn = (random.randint(0, WIDTH), HEIGHT + 30)
+    elif lado_tela == 'left': posicao_spawn = (-30, random.randint(0, HEIGHT))
+    else: posicao_spawn = (WIDTH + 30, random.randint(0, HEIGHT)) # right
     
-    if game_state == GameState.MENU:
-        if play_button.collidepoint(pos):
-            game_state = GameState.PLAYING
-            reset_game()
-        elif sound_button.collidepoint(pos):
-            sound_enabled = not sound_enabled
-            if not sound_enabled:
-                music.stop()
-        elif exit_button.collidepoint(pos):
+    # Adiciona variedade na geração de inimigos
+    if random.random() < 0.7: # 70% de chance para um Lobo
+        inimigos.append(Wolf(posicao_spawn)) # 'Wolf' é classe importada
+    else: # 30% de chance para um Morcego
+        inimigos.append(Bat(posicao_spawn)) # 'Bat' é classe importada
+
+    # Aumenta a taxa de geração ao longo do tempo
+    atraso_spawn = max(0.5, 2.5 - tempo_decorrido * 0.04)
+    clock.schedule_unique(gerar_inimigo, atraso_spawn) # 'clock' é objeto global do Pygame Zero
+
+# --- HOOKS DE EVENTO ---
+
+def on_mouse_down(pos, button): # Hook do Pygame Zero, nome e parâmetros mantidos (pos, button)
+    """Hook de evento de clique do mouse do PgZero."""
+    global estado_jogo, som_ligado
+    
+    if estado_jogo == EstadoJogo.MENU:
+        if botao_jogar.collidepoint(pos):
+            estado_jogo = EstadoJogo.JOGANDO
+            reiniciar_jogo()
+        elif botao_som.collidepoint(pos):
+            som_ligado = not som_ligado
+            if not som_ligado: music.stop()
+        elif botao_sair.collidepoint(pos):
             exit()
 
-    elif game_state == GameState.PLAYING:
-        if button == mouse.LEFT:
-            # Usar o dano base do projétil do jogador
-            projectiles.append(Projectile(player.actor.pos, pos, player.projectile_base_damage))
-            if sound_enabled: sounds.shoot.play()
+    elif estado_jogo == EstadoJogo.JOGANDO:
+        if button == mouse.LEFT: # 'mouse.LEFT' é constante do Pygame Zero
+            projeteis.append(Projetil(jogador.actor.pos, pos, jogador.projectile_base_damage))
+            if som_ligado: sounds.shoot.play() # 'shoot' é nome do arquivo de som
             
-    elif game_state == GameState.GAME_OVER:
-        game_state = GameState.MENU
+    elif estado_jogo == EstadoJogo.FIM_DE_JOGO:
+        estado_jogo = EstadoJogo.MENU
 
-    elif game_state == GameState.LEVEL_UP_CHOICE:
-        for i, btn_rect in enumerate(option_buttons):
-            if btn_rect.collidepoint(pos) and button == mouse.LEFT:
-                chosen_option = level_up_options[i]
-                chosen_option["apply"](player) # Aplica a melhoria ao jogador
-                print(f"Jogador escolheu: {chosen_option['text']}")
+    elif estado_jogo == EstadoJogo.ESCOLHA_MELHORIA:
+        for i, rect_botao_atual in enumerate(botoes_opcao):
+            if rect_botao_atual.collidepoint(pos) and button == mouse.LEFT:
+                item_escolhido = opcoes_melhoria[i]
+                item_escolhido.apply(jogador) # Aplica o efeito do item
+                print(f"Jogador escolheu: {item_escolhido.description}") # 'item_escolhido.description' vem do módulo Itens
                 
-                game_state = GameState.PLAYING # Volta ao jogo
-                # Limpar opções para a próxima vez
-                level_up_options.clear()
-                option_buttons.clear()
-                break # Sai do loop após encontrar o botão clicado
+                estado_jogo = EstadoJogo.JOGANDO
+                opcoes_melhoria.clear()
+                botoes_opcao.clear()
+                break
 
-# --- HELPER CLASSES AND FUNCTIONS ---
-class Projectile:
-    """Represents a projectile fired by the player."""
-    def __init__(self, start_pos, target_pos, damage_value): # Adicionado damage_value
-        self.actor = Actor("projectile.png", pos=start_pos)
-        dx = target_pos[0] - start_pos[0]
-        dy = target_pos[1] - start_pos[1]
-        angle_rad = math.atan2(dy, dx)
-        self.speed = 8
-        self.damage = damage_value # Usa o valor de dano passado
-        self.vx = math.cos(angle_rad) * self.speed
-        self.vy = math.sin(angle_rad) * self.speed
-        self.actor.angle = math.degrees(-angle_rad) + 90
+# --- CLASSES AUXILIARES ---
+
+class Projetil:
+    """Representa um projétil disparado pelo jogador."""
+    def __init__(self, pos_inicial, pos_alvo, valor_dano):
+        self.actor = Actor("projectile.png", pos=pos_inicial) # "projectile.png" é nome do arquivo de imagem
+        self.dano = valor_dano
+        self.velocidade = 8
+        
+        # Calcula o ângulo e componentes de velocidade
+        angulo_radianos = math.atan2(pos_alvo[1] - pos_inicial[1], pos_alvo[0] - pos_inicial[0])
+        self.vx = math.cos(angulo_radianos) * self.velocidade
+        self.vy = math.sin(angulo_radianos) * self.velocidade
+        self.actor.angle = math.degrees(-angulo_radianos) + 90 # Ajusta o ângulo do ator
 
     def update(self):
         self.actor.x += self.vx
@@ -405,25 +327,14 @@ class Projectile:
     def draw(self):
         self.actor.draw()
 
-class ExperienceGem:
-    """Represents an experience gem dropped by an enemy."""
-    def __init__(self, pos):
-        self.actor = Actor("gem.png", pos=pos)
+class GemaExperiencia:
+    """Representa uma gema de experiência deixada por um inimigo."""
+    def __init__(self, pos): # 'pos' é a posição
+        self.actor = Actor("gem.png", pos=pos) # "gem.png" é nome do arquivo de imagem
+        self.valor_xp = 10
 
-    def draw(self): # screen parameter is unused by Actor.draw()
+    def draw(self):
         self.actor.draw()
 
-def spawn_enemy():
-    """Spawns a new enemy at a random position off-screen."""
-    side = random.choice(['top', 'bottom', 'left', 'right'])
-    if side == 'top': pos = (random.randint(0, WIDTH), -30)
-    elif side == 'bottom': pos = (random.randint(0, WIDTH), HEIGHT + 30)
-    elif side == 'left': pos = (-30, random.randint(0, HEIGHT))
-    else: pos = (WIDTH + 30, random.randint(0, HEIGHT))
-    
-    enemies.append(Enemy(pos))
-    # Schedule the next enemy spawn
-    clock.schedule_unique(spawn_enemy, max(0.5, 3.0 - elapsed_time * 0.05))
-
-# --- START THE GAME ---
-pgzrun.go()
+# --- INICIA O JOGO ---
+pgzrun.go() # Função do Pygame Zero para iniciar o jogo
