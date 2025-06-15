@@ -34,7 +34,7 @@
 
 1. **Clone o repositório:**
 ```bash
-git clone https://github.com/seu-usuario/cyber-duck.git
+git clone https://github.com/BrunoPinheirofe/cyber-duck.git
 cd cyber-duck
 ```
 
