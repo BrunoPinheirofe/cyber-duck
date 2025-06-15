@@ -23,6 +23,11 @@ game_state = GameState.MENU
 sound_enabled = True
 elapsed_time = 0
 
+# --- HEALTH DISPLAY CONFIGURATION ---
+NUM_HEART_CONTAINERS = 5
+HEART_IMAGE_WIDTH = 16  # Assuming heart images are 16px wide. Adjust if different.
+HEART_SPACING = 4       # Spacing between hearts.
+
 # --- GAME OBJECT LISTS ---
 enemies = []
 projectiles = []
@@ -125,6 +130,21 @@ def draw_playing():
     seconds = int(elapsed_time % 60)
     screen.draw.text(f"Time: {minutes:02d}:{seconds:02d}", topright=(WIDTH - 10, 10), fontsize=30, color="white")
 
+    # Draw player health (hearts)
+    health_per_heart = player.max_health / NUM_HEART_CONTAINERS
+    heart_x_start = 10
+    heart_y = 10
+
+    for i in range(NUM_HEART_CONTAINERS):
+        current_heart_x = heart_x_start + i * (HEART_IMAGE_WIDTH + HEART_SPACING)
+        # If player's health is greater than the health represented by previous hearts,
+        # this heart is at least partially full (we draw it as full).
+        if player.health > i * health_per_heart:
+            screen.blit("heart_full.png", (current_heart_x, heart_y))
+        else:
+            screen.blit("heart_empty.png", (current_heart_x, heart_y))
+
+
 
 def draw_game_over():
     """Draws the game over screen with final stats."""
@@ -166,11 +186,17 @@ def update_playing(dt):
         e.update(player.actor.pos)
         # Check for collision with the player
         if e.actor.colliderect(player.actor):
-            game_state = GameState.GAME_OVER
-            music.stop()
-            if sound_enabled: sounds.hit.play()
-            return # Stop processing further logic in this frame
+            player.take_damage(e.damage) # Player takes damage from the enemy
+            if sound_enabled: sounds.hit.play() # Play hit sound
+            
+            # Remove the enemy that hit the player to prevent multiple hits from the same enemy instance
+            enemies.remove(e) 
 
+            if player.health <= 0:
+                game_state = GameState.GAME_OVER
+                music.stop()
+                # Player defeated sound could be added here if different from generic hit
+                return # Stop processing further logic in this frame if game is over
     # Update projectiles and check for hits
     for p in projectiles[:]:
         p.update()

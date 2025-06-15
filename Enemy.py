@@ -9,7 +9,8 @@ class Enemy:
         # The get_random_spawn_pos logic was redundant and incorrectly using
         # the components of 'pos' as boundaries.
         self.actor = Actor("wolf-atack.png", pos=pos)
-        self.speed = 2
+        self.speed = 1 # Adjusted speed for testing, can be 2 or other value
+        self.damage = 20 # Amount of damage this enemy deals on collision
     def update(self, player_pos):
         dx = player_pos[0] - self.actor.x
         dy = player_pos[1] - self.actor.y

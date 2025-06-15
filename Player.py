@@ -67,8 +67,8 @@ class Player:
             else:
                 active_frames = self.walk_left_frames
         else: # Player is idle
-            # Currently, idle frames are right-facing.
-            active_frames = self.walk_left_frames
+            # Corrected: Use idle_frames when player is not moving.
+            active_frames = self.idle_frames
 
         if self.animation_timer >= self.animation_speed:
             self.animation_timer = 0
@@ -109,6 +109,12 @@ class Player:
             print(f"LEVEL UP! Novo Nível: {self.level}")
             leveled_up_this_call = True
         return leveled_up_this_call
+
+    def take_damage(self, amount):
+        if self.health > 0:  # Only take damage if alive
+            self.health -= amount
+            self.health = max(0, self.health)  # Clamp health at 0
+        # Game over check will be handled in main.py based on self.health
 
     # def check_level_up(self): # This method is now redundant
     #     if self.experience >= self.xp_to_next_level:
