@@ -107,7 +107,6 @@ pgzrun main.py
 - **🐍 Python 3.8+**: Linguagem principal
 - **🎮 Pygame Zero 1.2+**: Framework de desenvolvimento de jogos
 - **🎮 Pygame 2.6+**: Biblioteca base para gráficos e input
-- **📊 NumPy 2.3+**: Biblioteca para cálculos matemáticos
 - **🎨 Assets Customizados**: Sprites e recursos visuais
 
 ## 📁 Estrutura do Projeto
